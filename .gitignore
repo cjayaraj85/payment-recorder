@@ -12,3 +12,4 @@ htmlcov/
 payments.db
 receipts/
 reports/
+.ipynb_checkpoints/

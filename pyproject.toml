@@ -13,10 +13,14 @@ authors = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+llm = ["litellm>=1.0"]
+
 [project.scripts]
 payment-recorder = "payment_recorder.cli:main"
 doc-agent = "doc_agent.cli:main"
 function-agent = "function_agent.cli:main"
+llm-function-agent = "function_agent.llm_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

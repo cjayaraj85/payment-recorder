@@ -85,6 +85,33 @@ Available demo tools:
 - `read_text_file` reads a UTF-8 text file under the workspace.
 - `get_current_directory` returns the workspace path.
 
+## LLM Function-Calling Agent Notebook
+
+Open `notebooks/llm_function_calling_agent.ipynb` to run the Step 3 style LLM
+function-calling demo from the attached instructions. It defines Python
+functions, passes JSON Schema tool definitions to the model, reads the model's
+structured `tool_calls`, and executes the selected function from a registry.
+
+Install the optional LLM dependency and configure your key before calling a real
+model:
+
+```bash
+python3 -m pip install litellm
+export OPENAI_API_KEY=...
+```
+
+Then run the notebook cells and try:
+
+```text
+tell me the files in the current directory
+```
+
+You can run the same flow from the terminal:
+
+```bash
+python3 llm_function_agent.py
+```
+
 ## Development
 
 Run the test suite:
