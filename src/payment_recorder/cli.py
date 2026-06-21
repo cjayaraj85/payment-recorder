@@ -10,6 +10,7 @@ from typing import Iterable, Optional
 from .receipts import render_html_receipt, render_text_receipt
 from .reports import render_csv_report, render_text_report
 from .storage import PaymentInput, PaymentStore
+from .web import DEFAULT_HOST, DEFAULT_PORT, run_server
 
 
 DEFAULT_DB_PATH = "payments.db"
@@ -66,6 +67,8 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
                 content = render_text_report(payments)
                 default_filename = "payment-report.txt"
             write_or_print(content, args.output, default_filename)
+        elif args.command == "serve":
+            run_server(Path(args.db), args.host, args.port)
         else:
             parser.print_help()
             return 2
@@ -155,6 +158,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output file or directory. Prints to stdout when omitted.",
     )
 
+    serve_parser = subparsers.add_parser(
+        "serve",
+        parents=[parent],
+        help="Run the browser UI over HTTP.",
+    )
+    serve_parser.add_argument(
+        "--host",
+        default=DEFAULT_HOST,
+        help=f"Host interface to bind. Defaults to {DEFAULT_HOST}.",
+    )
+    serve_parser.add_argument(
+        "--port",
+        default=DEFAULT_PORT,
+        type=int,
+        help=f"Port to bind. Defaults to {DEFAULT_PORT}.",
+    )
+
     return parser
 
 
@@ -189,4 +209,3 @@ def write_or_print(content: str, output: Optional[str], default_filename: str) -
         path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     print(f"Wrote {path}")
-

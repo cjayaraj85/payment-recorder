@@ -1,9 +1,12 @@
 from datetime import date
 from decimal import Decimal
+from http.client import HTTPConnection
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import unittest
+from urllib.parse import urlencode
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -12,6 +15,7 @@ from payment_recorder.cli import main
 from payment_recorder.receipts import render_html_receipt, render_text_receipt
 from payment_recorder.reports import render_csv_report, render_text_report
 from payment_recorder.storage import PaymentInput, PaymentStore
+from payment_recorder.web import create_server
 
 
 class PaymentRecorderTests(unittest.TestCase):
@@ -150,7 +154,59 @@ class PaymentRecorderTests(unittest.TestCase):
             self.assertEqual(receipt_result, 0)
             self.assertIn("CLI Customer", receipt_path.read_text(encoding="utf-8"))
 
+    def test_web_ui_adds_payment_and_serves_reports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            server = create_server(Path(tmp) / "payments.db", port=0)
+            host, port = server.server_address[:2]
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                connection = HTTPConnection(host, port)
+                connection.request("GET", "/")
+                response = connection.getresponse()
+                body = response.read().decode("utf-8")
+                self.assertEqual(response.status, 200)
+                self.assertIn("Add Payment", body)
+
+                payload = urlencode(
+                    {
+                        "customer_name": "Web Customer",
+                        "customer_email": "web@example.com",
+                        "amount": "33.45",
+                        "currency": "USD",
+                        "payment_method": "card",
+                        "payment_date": "2026-06-21",
+                        "reference": "WEB-1",
+                    }
+                )
+                connection.request(
+                    "POST",
+                    "/payments",
+                    body=payload,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+                response = connection.getresponse()
+                response.read()
+                self.assertEqual(response.status, 303)
+                self.assertIn("RCPT-202606-000001", response.getheader("Location", ""))
+
+                connection.request("GET", "/receipt?payment=RCPT-202606-000001")
+                response = connection.getresponse()
+                receipt = response.read().decode("utf-8")
+                self.assertEqual(response.status, 200)
+                self.assertIn("Web Customer", receipt)
+
+                connection.request("GET", "/reports.csv")
+                response = connection.getresponse()
+                csv_body = response.read().decode("utf-8")
+                self.assertEqual(response.status, 200)
+                self.assertIn("Web Customer", csv_body)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+
 
 if __name__ == "__main__":
     unittest.main()
-

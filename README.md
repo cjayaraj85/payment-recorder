@@ -46,6 +46,23 @@ python3 app.py report --db payments.db
 python3 app.py report --db payments.db --start 2026-06-01 --end 2026-06-30 --format csv --output reports/june.csv
 ```
 
+## Web UI
+
+Run the local HTTP server:
+
+```bash
+python3 app.py serve --db payments.db --host 127.0.0.1 --port 8000
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The browser UI supports adding payments, opening HTML receipts, filtering the
+payments report by date, and downloading a CSV report.
+
 ## Development
 
 Run the test suite:
