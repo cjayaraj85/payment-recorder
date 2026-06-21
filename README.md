@@ -91,6 +91,8 @@ Open `notebooks/llm_function_calling_agent.ipynb` to run the Step 3 style LLM
 function-calling demo from the attached instructions. It defines Python
 functions, passes JSON Schema tool definitions to the model, reads the model's
 structured `tool_calls`, and executes the selected function from a registry.
+The simplified loop keeps tool results in memory and continues until the model
+calls the `terminate` tool or the maximum iteration count is reached.
 
 Install the optional LLM dependency and configure your key before calling a real
 model:
@@ -111,6 +113,12 @@ You can run the same flow from the terminal:
 ```bash
 python3 llm_function_agent.py
 ```
+
+Available LLM demo tools:
+
+- `list_files` lists files and directories under the workspace root.
+- `read_file` reads a UTF-8 text file under the workspace root.
+- `terminate` ends the loop with a final summary message.
 
 ## Development
 

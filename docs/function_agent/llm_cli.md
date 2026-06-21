@@ -16,7 +16,7 @@ No top-level classes found.
 
 ### `main(argv: Optional[Iterable[str]] = None) -> int`
 
-Prompt for a task, call the LLM, and execute the selected function.
+Prompt for a task and run the LLM function-calling agent loop.
 
 ### `build_parser() -> argparse.ArgumentParser`
 

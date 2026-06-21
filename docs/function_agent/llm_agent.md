@@ -19,6 +19,23 @@ Methods:
 - `called_tool(self) -> bool`
 - `format(self) -> str`
 
+### `LLMAgentLoopStep`
+
+One function-calling iteration from the simplified agent loop.
+
+Methods:
+
+- `error(self) -> Optional[str]`
+
+### `LLMAgentLoopResult`
+
+Result from a multi-step function-calling agent loop.
+
+Methods:
+
+- `terminated(self) -> bool`
+- `format(self) -> str`
+
 ### `LLMFunctionCallingAgent`
 
 Agent that delegates tool choice to an LLM function-calling API.
@@ -28,8 +45,11 @@ Methods:
 - `__init__(self, root: Optional[Path] = None, model: str = 'openai/gpt-4o', completion_fn: Optional[CompletionFunction] = None)`
 - `list_files(self) -> List[str]`
 - `read_file(self, file_name: str) -> str`
+- `terminate(self, message: str) -> str`
 - `tools(self) -> List[Dict[str, Any]]`
 - `run(self, user_task: str) -> LLMFunctionCallResult`
+- `run_loop(self, user_task: str, max_iterations: int = 10) -> LLMAgentLoopResult`
+- `execute_tool_call(self, tool_call: Any) -> Tuple[Dict[str, Any], Dict[str, Any]]`
 - `execute_tool(self, tool_name: str, tool_args: Mapping[str, Any]) -> Any`
 
 ## Functions

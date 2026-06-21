@@ -103,7 +103,130 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
         self.assertEqual(parse_tool_arguments('{"file_name": "README.md"}'), {"file_name": "README.md"})
         self.assertEqual(parse_tool_arguments(""), {})
 
+    def test_loop_runs_tools_until_terminate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "alpha.txt").write_text("alpha", encoding="utf-8")
+            calls = []
+            responses = [
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "tool_calls": [
+                                    {
+                                        "function": {
+                                            "name": "list_files",
+                                            "arguments": "{}",
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "tool_calls": [
+                                    {
+                                        "function": {
+                                            "name": "terminate",
+                                            "arguments": '{"message": "Listed the files."}',
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+            ]
+
+            def fake_completion(**kwargs):
+                calls.append(kwargs)
+                return responses[len(calls) - 1]
+
+            response = LLMFunctionCallingAgent(
+                root=root,
+                completion_fn=fake_completion,
+            ).run_loop("tell me the files in the current directory")
+
+            self.assertTrue(response.terminated)
+            self.assertEqual(response.final_message, "Listed the files.")
+            self.assertEqual(response.stopped_reason, "terminated")
+            self.assertEqual(len(response.steps), 2)
+            self.assertEqual(response.steps[0].tool_name, "list_files")
+            self.assertEqual(response.steps[0].result, {"result": ["alpha.txt"]})
+            self.assertEqual(response.steps[1].tool_name, "terminate")
+            self.assertIn('"result": ["alpha.txt"]', calls[1]["messages"][-1]["content"])
+
+    def test_loop_returns_text_when_model_does_not_call_tool(self) -> None:
+        def fake_completion(**kwargs):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "No tool is needed.",
+                            "tool_calls": None,
+                        }
+                    }
+                ]
+            }
+
+        response = LLMFunctionCallingAgent(completion_fn=fake_completion).run_loop("hello")
+
+        self.assertFalse(response.terminated)
+        self.assertEqual(response.final_message, "No tool is needed.")
+        self.assertEqual(response.stopped_reason, "model_response")
+
+    def test_loop_feeds_invalid_tool_arguments_back_to_model(self) -> None:
+        calls = []
+        responses = [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "read_file",
+                                        "arguments": "{bad json",
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "terminate",
+                                        "arguments": '{"message": "Could not read the file."}',
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        ]
+
+        def fake_completion(**kwargs):
+            calls.append(kwargs)
+            return responses[len(calls) - 1]
+
+        response = LLMFunctionCallingAgent(completion_fn=fake_completion).run_loop("read bad")
+
+        self.assertTrue(response.terminated)
+        self.assertIn("Invalid arguments for read_file", response.steps[0].error)
+        self.assertIn("Invalid arguments for read_file", calls[1]["messages"][-1]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()
-
