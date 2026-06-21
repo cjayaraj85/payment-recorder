@@ -77,6 +77,31 @@ Run the CLI from the working tree:
 python3 app.py --help
 ```
 
+## Documentation Agent
+
+This repository also includes a small AI-agent style example that demonstrates
+structured tool descriptions, JSON Schema parameter metadata, validated tool
+execution, and generated documentation.
+
+Print the available tool metadata:
+
+```bash
+python3 doc_agent.py tools
+```
+
+Generate Markdown documentation from Python files in `src/` into `docs/`:
+
+```bash
+python3 doc_agent.py run --show-trace
+```
+
+The agent uses three tools:
+
+- `list_python_files` returns Python files from the configured source directory.
+- `read_file` reads a selected Python file after validating the `file_path` arg.
+- `write_doc_file` writes Markdown into the configured docs directory after
+  validating `file_name` and `content`.
+
 ## Data Model
 
 Payments are stored in a local SQLite database. The database file defaults to

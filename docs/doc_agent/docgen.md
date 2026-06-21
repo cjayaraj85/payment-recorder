@@ -1,0 +1,45 @@
+# `doc_agent.docgen`
+
+Source: `src/doc_agent/docgen.py`
+
+## Summary
+
+Markdown documentation generation from Python source code.
+
+## Classes
+
+No top-level classes found.
+
+## Functions
+
+### `generate_markdown_documentation(file_path: str, source: str) -> str`
+
+Generate Markdown documentation for one Python source file.
+
+### `render_classes(classes: Iterable[ast.ClassDef]) -> List[str]`
+
+Render documentation for top-level classes.
+
+### `render_functions(functions: Iterable[ast.AST]) -> List[str]`
+
+Render documentation for top-level functions.
+
+### `format_signature(function: ast.AST) -> str`
+
+Render a Python function signature from an AST node.
+
+### `format_arg(arg: ast.arg, default: Optional[ast.AST]) -> str`
+
+Render a function argument with annotation and default value.
+
+### `unparse(node: ast.AST) -> str`
+
+Convert an AST node back into source-like text.
+
+### `module_name_from_path(file_path: str) -> str`
+
+Convert a source path into a dotted module name.
+
+### `documentation_file_name(file_path: str, src_dir: str = 'src') -> str`
+
+Convert a source path into its docs-relative Markdown file name.

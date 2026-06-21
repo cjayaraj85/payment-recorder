@@ -1,0 +1,144 @@
+"""Markdown documentation generation from Python source code."""
+
+from __future__ import annotations
+
+import ast
+from pathlib import PurePosixPath
+from typing import Iterable, List, Optional
+
+
+def generate_markdown_documentation(file_path: str, source: str) -> str:
+    """Generate Markdown documentation for one Python source file."""
+    module = ast.parse(source)
+    module_name = module_name_from_path(file_path)
+    summary = ast.get_docstring(module) or "No module docstring provided."
+    classes = [node for node in module.body if isinstance(node, ast.ClassDef)]
+    functions = [node for node in module.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]
+
+    lines = [
+        f"# `{module_name}`",
+        "",
+        f"Source: `{file_path}`",
+        "",
+        "## Summary",
+        "",
+        summary,
+        "",
+    ]
+
+    lines.extend(render_classes(classes))
+    lines.extend(render_functions(functions))
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def render_classes(classes: Iterable[ast.ClassDef]) -> List[str]:
+    """Render documentation for top-level classes."""
+    class_list = list(classes)
+    if not class_list:
+        return ["## Classes", "", "No top-level classes found.", ""]
+
+    lines = ["## Classes", ""]
+    for class_node in class_list:
+        lines.extend(
+            [
+                f"### `{class_node.name}`",
+                "",
+                ast.get_docstring(class_node) or "No class docstring provided.",
+                "",
+            ]
+        )
+        methods = [
+            node
+            for node in class_node.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        if methods:
+            lines.extend(["Methods:", ""])
+            for method in methods:
+                lines.append(f"- `{method.name}{format_signature(method)}`")
+            lines.append("")
+        else:
+            lines.extend(["Methods: none.", ""])
+    return lines
+
+
+def render_functions(functions: Iterable[ast.AST]) -> List[str]:
+    """Render documentation for top-level functions."""
+    function_list = list(functions)
+    if not function_list:
+        return ["## Functions", "", "No top-level functions found.", ""]
+
+    lines = ["## Functions", ""]
+    for function in function_list:
+        if isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            prefix = "async " if isinstance(function, ast.AsyncFunctionDef) else ""
+            lines.extend(
+                [
+                    f"### `{prefix}{function.name}{format_signature(function)}`",
+                    "",
+                    ast.get_docstring(function) or "No function docstring provided.",
+                    "",
+                ]
+            )
+    return lines
+
+
+def format_signature(function: ast.AST) -> str:
+    """Render a Python function signature from an AST node."""
+    if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return "()"
+    args = function.args
+    parts = []
+    positional = list(args.posonlyargs) + list(args.args)
+    defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
+
+    for index, arg in enumerate(positional):
+        parts.append(format_arg(arg, defaults[index]))
+    if args.vararg:
+        parts.append("*" + args.vararg.arg)
+    elif args.kwonlyargs:
+        parts.append("*")
+    for index, arg in enumerate(args.kwonlyargs):
+        parts.append(format_arg(arg, args.kw_defaults[index]))
+    if args.kwarg:
+        parts.append("**" + args.kwarg.arg)
+
+    signature = "(" + ", ".join(parts) + ")"
+    if function.returns is not None:
+        signature += " -> " + unparse(function.returns)
+    return signature
+
+
+def format_arg(arg: ast.arg, default: Optional[ast.AST]) -> str:
+    """Render a function argument with annotation and default value."""
+    rendered = arg.arg
+    if arg.annotation is not None:
+        rendered += ": " + unparse(arg.annotation)
+    if default is not None:
+        rendered += " = " + unparse(default)
+    return rendered
+
+
+def unparse(node: ast.AST) -> str:
+    """Convert an AST node back into source-like text."""
+    if hasattr(ast, "unparse"):
+        return ast.unparse(node)
+    return "..."
+
+
+def module_name_from_path(file_path: str) -> str:
+    """Convert a source path into a dotted module name."""
+    path = PurePosixPath(file_path)
+    parts = list(path.with_suffix("").parts)
+    if parts and parts[0] == "src":
+        parts = parts[1:]
+    return ".".join(parts)
+
+
+def documentation_file_name(file_path: str, src_dir: str = "src") -> str:
+    """Convert a source path into its docs-relative Markdown file name."""
+    path = PurePosixPath(file_path)
+    parts = list(path.parts)
+    if parts and parts[0] == src_dir:
+        path = PurePosixPath(*parts[1:])
+    return path.with_suffix(".md").as_posix()

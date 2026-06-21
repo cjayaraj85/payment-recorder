@@ -1,0 +1,21 @@
+# `doc_agent.cli`
+
+Source: `src/doc_agent/cli.py`
+
+## Summary
+
+Command-line interface for the documentation agent.
+
+## Classes
+
+No top-level classes found.
+
+## Functions
+
+### `main(argv: Optional[Iterable[str]] = None) -> int`
+
+Run the documentation agent CLI.
+
+### `build_parser() -> argparse.ArgumentParser`
+
+Build the doc-agent argument parser.

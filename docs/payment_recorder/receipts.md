@@ -1,0 +1,21 @@
+# `payment_recorder.receipts`
+
+Source: `src/payment_recorder/receipts.py`
+
+## Summary
+
+No module docstring provided.
+
+## Classes
+
+No top-level classes found.
+
+## Functions
+
+### `render_text_receipt(payment: Payment) -> str`
+
+No function docstring provided.
+
+### `render_html_receipt(payment: Payment) -> str`
+
+No function docstring provided.

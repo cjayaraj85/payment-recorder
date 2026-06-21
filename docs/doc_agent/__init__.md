@@ -1,0 +1,15 @@
+# `doc_agent.__init__`
+
+Source: `src/doc_agent/__init__.py`
+
+## Summary
+
+A small documentation agent with structured tool metadata.
+
+## Classes
+
+No top-level classes found.
+
+## Functions
+
+No top-level functions found.
