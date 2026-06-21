@@ -63,6 +63,28 @@ http://127.0.0.1:8000
 The browser UI supports adding payments, opening HTML receipts, filtering the
 payments report by date, and downloading a CSV report.
 
+## Function-Calling Agent Notebook
+
+Open `notebooks/function_calling_agent.ipynb` and run the cells in order. The
+second code cell prompts for a request such as:
+
+```text
+tell me the files in the current directory
+```
+
+The agent chooses one of its Python function tools and prints the selected tool
+call plus the tool result. You can also run the same demo from the terminal:
+
+```bash
+python3 function_agent.py
+```
+
+Available demo tools:
+
+- `list_directory` lists files and directories under the workspace.
+- `read_text_file` reads a UTF-8 text file under the workspace.
+- `get_current_directory` returns the workspace path.
+
 ## Development
 
 Run the test suite:

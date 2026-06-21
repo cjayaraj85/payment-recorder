@@ -16,6 +16,7 @@ dependencies = []
 [project.scripts]
 payment-recorder = "payment_recorder.cli:main"
 doc-agent = "doc_agent.cli:main"
+function-agent = "function_agent.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
