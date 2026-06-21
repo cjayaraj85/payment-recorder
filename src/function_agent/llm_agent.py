@@ -30,8 +30,11 @@ LLM_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "list_files",
-            "description": "Returns a list of files in the current workspace directory.",
+            "name": "list_workspace_files",
+            "description": (
+                "Returns files and directories from the workspace root. "
+                "Use this before reading a workspace file so file names are accurate."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -43,8 +46,11 @@ LLM_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "read_file",
-            "description": "Reads the content of a specified file in the workspace.",
+            "name": "read_workspace_text_file",
+            "description": (
+                "Reads one UTF-8 text file under the workspace root. "
+                "Use a file name or relative path returned by list_workspace_files."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -176,22 +182,43 @@ class LLMFunctionCallingAgent:
         self.model = model
         self.completion_fn = completion_fn or litellm_completion
         self.tool_functions = {
-            "list_files": self.list_files,
-            "read_file": self.read_file,
+            "list_workspace_files": self.list_workspace_files,
+            "read_workspace_text_file": self.read_workspace_text_file,
             "terminate": self.terminate,
+            # Hidden compatibility aliases for older notebooks/tests. These are
+            # executable but are not advertised to the model in tools().
+            "list_files": self.list_workspace_files,
+            "read_file": self.read_workspace_text_file,
         }
 
-    def list_files(self) -> List[str]:
-        """List files in the workspace root."""
-        return list_directory(self.context, ".")
+    def list_workspace_files(self) -> Dict[str, Any]:
+        """List files in the workspace root using a specific tool name."""
+        return {"files": list_directory(self.context, ".")}
 
-    def read_file(self, file_name: str) -> str:
-        """Read a UTF-8 text file from the workspace."""
-        return read_text_file(self.context, file_name)
+    def read_workspace_text_file(self, file_name: str) -> Dict[str, Any]:
+        """Read a UTF-8 text file from the workspace with guided errors."""
+        if not file_name or not file_name.strip():
+            return {
+                "error": "file_name is required.",
+                "next_action": "Call list_workspace_files to choose a valid file name.",
+            }
 
-    def terminate(self, message: str) -> str:
+        try:
+            content = read_text_file(self.context, file_name)
+        except ToolExecutionError as exc:
+            return {
+                "error": str(exc),
+                "next_action": (
+                    "Call list_workspace_files to get valid workspace file names, "
+                    "then call read_workspace_text_file with one of those names."
+                ),
+            }
+
+        return {"file_name": file_name, "content": content}
+
+    def terminate(self, message: str) -> Dict[str, str]:
         """Return the final summary message for a completed agent loop."""
-        return message
+        return {"message": message}
 
     def tools(self) -> List[Dict[str, Any]]:
         """Return OpenAI/LiteLLM-style function tool definitions."""
@@ -275,7 +302,7 @@ class LLMFunctionCallingAgent:
             steps.append(step)
 
             if step.tool_name == "terminate" and step.error is None:
-                final_message = str(result.get("result", ""))
+                final_message = str(result.get("message", result.get("result", "")))
                 memory.append({"role": "assistant", "content": json.dumps(action)})
                 return LLMAgentLoopResult(
                     user_task=user_task,
@@ -318,9 +345,16 @@ class LLMFunctionCallingAgent:
 
         action = {"tool_name": tool_name, "args": tool_args}
         try:
-            return action, {"result": self.execute_tool(tool_name, tool_args)}
+            tool_result = self.execute_tool(tool_name, tool_args)
         except Exception as exc:
-            return action, {"error": f"Error executing {tool_name}: {exc}"}
+            return action, {
+                "error": f"Error executing {tool_name}: {exc}",
+                "next_action": "Review the available tool schema and retry with valid arguments.",
+            }
+
+        if isinstance(tool_result, dict):
+            return action, tool_result
+        return action, {"result": tool_result}
 
     def execute_tool(self, tool_name: str, tool_args: Mapping[str, Any]) -> Any:
         """Look up and execute a model-selected tool function."""

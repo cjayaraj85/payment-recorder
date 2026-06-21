@@ -93,6 +93,8 @@ functions, passes JSON Schema tool definitions to the model, reads the model's
 structured `tool_calls`, and executes the selected function from a registry.
 The simplified loop keeps tool results in memory and continues until the model
 calls the `terminate` tool or the maximum iteration count is reached.
+The tools use descriptive, task-specific names and structured responses so the
+model has less room to guess incorrectly.
 
 Install the optional LLM dependency and configure your key before calling a real
 model:
@@ -116,8 +118,8 @@ python3 llm_function_agent.py
 
 Available LLM demo tools:
 
-- `list_files` lists files and directories under the workspace root.
-- `read_file` reads a UTF-8 text file under the workspace root.
+- `list_workspace_files` lists files and directories under the workspace root.
+- `read_workspace_text_file` reads a UTF-8 text file under the workspace root.
 - `terminate` ends the loop with a final summary message.
 
 ## Development

@@ -9,6 +9,7 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
+.DS_Store
 payments.db
 receipts/
 reports/

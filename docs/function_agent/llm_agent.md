@@ -43,9 +43,9 @@ Agent that delegates tool choice to an LLM function-calling API.
 Methods:
 
 - `__init__(self, root: Optional[Path] = None, model: str = 'openai/gpt-4o', completion_fn: Optional[CompletionFunction] = None)`
-- `list_files(self) -> List[str]`
-- `read_file(self, file_name: str) -> str`
-- `terminate(self, message: str) -> str`
+- `list_workspace_files(self) -> Dict[str, Any]`
+- `read_workspace_text_file(self, file_name: str) -> Dict[str, Any]`
+- `terminate(self, message: str) -> Dict[str, str]`
 - `tools(self) -> List[Dict[str, Any]]`
 - `run(self, user_task: str) -> LLMFunctionCallResult`
 - `run_loop(self, user_task: str, max_iterations: int = 10) -> LLMAgentLoopResult`

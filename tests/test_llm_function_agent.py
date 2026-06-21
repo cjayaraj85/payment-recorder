@@ -10,7 +10,22 @@ from function_agent.llm_agent import LLMFunctionCallingAgent, parse_tool_argumen
 
 
 class LLMFunctionCallingAgentTests(unittest.TestCase):
-    def test_executes_model_selected_list_files_tool(self) -> None:
+    def test_exposes_descriptive_workspace_tool_names(self) -> None:
+        agent = LLMFunctionCallingAgent()
+        tool_names = [tool["function"]["name"] for tool in agent.tools()]
+
+        self.assertEqual(
+            tool_names,
+            [
+                "list_workspace_files",
+                "read_workspace_text_file",
+                "terminate",
+            ],
+        )
+        self.assertNotIn("list_files", tool_names)
+        self.assertNotIn("read_file", tool_names)
+
+    def test_executes_model_selected_list_workspace_files_tool(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "alpha.txt").write_text("alpha", encoding="utf-8")
@@ -26,7 +41,7 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
                                 "tool_calls": [
                                     {
                                         "function": {
-                                            "name": "list_files",
+                                            "name": "list_workspace_files",
                                             "arguments": "{}",
                                         }
                                     }
@@ -41,14 +56,17 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
                 completion_fn=fake_completion,
             ).run("tell me the files in the current directory")
 
-            self.assertEqual(response.tool_name, "list_files")
+            self.assertEqual(response.tool_name, "list_workspace_files")
             self.assertEqual(response.tool_args, {})
-            self.assertEqual(response.result, ["alpha.txt", "folder/"])
+            self.assertEqual(response.result, {"files": ["alpha.txt", "folder/"]})
             self.assertEqual(captured["model"], "openai/gpt-4o")
             self.assertEqual(captured["tools"][0]["type"], "function")
-            self.assertEqual(captured["tools"][0]["function"]["name"], "list_files")
+            self.assertEqual(
+                captured["tools"][0]["function"]["name"],
+                "list_workspace_files",
+            )
 
-    def test_executes_model_selected_read_file_tool(self) -> None:
+    def test_executes_model_selected_read_workspace_text_file_tool(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "README.md").write_text("# Demo\n", encoding="utf-8")
@@ -61,7 +79,7 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
                                 "tool_calls": [
                                     {
                                         "function": {
-                                            "name": "read_file",
+                                            "name": "read_workspace_text_file",
                                             "arguments": '{"file_name": "README.md"}',
                                         }
                                     }
@@ -76,9 +94,25 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
                 completion_fn=fake_completion,
             ).run("read README.md")
 
-            self.assertEqual(response.tool_name, "read_file")
+            self.assertEqual(response.tool_name, "read_workspace_text_file")
             self.assertEqual(response.tool_args, {"file_name": "README.md"})
-            self.assertEqual(response.result, "# Demo\n")
+            self.assertEqual(
+                response.result,
+                {"file_name": "README.md", "content": "# Demo\n"},
+            )
+
+    def test_legacy_tool_names_still_execute_as_hidden_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "alpha.txt").write_text("alpha", encoding="utf-8")
+
+            agent = LLMFunctionCallingAgent(root=root)
+
+            self.assertEqual(agent.execute_tool("list_files", {}), {"files": ["alpha.txt"]})
+            self.assertEqual(
+                agent.execute_tool("read_file", {"file_name": "alpha.txt"}),
+                {"file_name": "alpha.txt", "content": "alpha"},
+            )
 
     def test_returns_model_text_when_no_tool_is_called(self) -> None:
         def fake_completion(**kwargs):
@@ -116,7 +150,7 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
                                 "tool_calls": [
                                     {
                                         "function": {
-                                            "name": "list_files",
+                                            "name": "list_workspace_files",
                                             "arguments": "{}",
                                         }
                                     }
@@ -156,10 +190,11 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
             self.assertEqual(response.final_message, "Listed the files.")
             self.assertEqual(response.stopped_reason, "terminated")
             self.assertEqual(len(response.steps), 2)
-            self.assertEqual(response.steps[0].tool_name, "list_files")
-            self.assertEqual(response.steps[0].result, {"result": ["alpha.txt"]})
+            self.assertEqual(response.steps[0].tool_name, "list_workspace_files")
+            self.assertEqual(response.steps[0].result, {"files": ["alpha.txt"]})
             self.assertEqual(response.steps[1].tool_name, "terminate")
-            self.assertIn('"result": ["alpha.txt"]', calls[1]["messages"][-1]["content"])
+            self.assertEqual(response.steps[1].result, {"message": "Listed the files."})
+            self.assertIn('"files": ["alpha.txt"]', calls[1]["messages"][-1]["content"])
 
     def test_loop_returns_text_when_model_does_not_call_tool(self) -> None:
         def fake_completion(**kwargs):
@@ -189,11 +224,11 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
                         "message": {
                             "tool_calls": [
                                 {
-                                    "function": {
-                                        "name": "read_file",
-                                        "arguments": "{bad json",
+                                        "function": {
+                                            "name": "read_workspace_text_file",
+                                            "arguments": "{bad json",
+                                        }
                                     }
-                                }
                             ]
                         }
                     }
@@ -224,8 +259,18 @@ class LLMFunctionCallingAgentTests(unittest.TestCase):
         response = LLMFunctionCallingAgent(completion_fn=fake_completion).run_loop("read bad")
 
         self.assertTrue(response.terminated)
-        self.assertIn("Invalid arguments for read_file", response.steps[0].error)
-        self.assertIn("Invalid arguments for read_file", calls[1]["messages"][-1]["content"])
+        self.assertIn("Invalid arguments for read_workspace_text_file", response.steps[0].error)
+        self.assertIn("Invalid arguments for read_workspace_text_file", calls[1]["messages"][-1]["content"])
+
+    def test_read_workspace_text_file_returns_guided_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            response = LLMFunctionCallingAgent(root=Path(tmp)).read_workspace_text_file(
+                "missing.txt"
+            )
+
+            self.assertIn("error", response)
+            self.assertIn("next_action", response)
+            self.assertIn("list_workspace_files", response["next_action"])
 
 
 if __name__ == "__main__":
