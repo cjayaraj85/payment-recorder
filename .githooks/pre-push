@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+echo "Running generated documentation freshness check..."
+python3 doc_agent.py run --check
+

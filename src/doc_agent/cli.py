@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Iterable, Optional
 
-from .agent import DocumentationAgent
+from .agent import AgentRunResult, DocumentationAgent
 from .executor import ToolExecutor
 from .tools import ToolContext, build_tool_registry
 
@@ -28,10 +28,31 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         return 0
 
     if args.command == "run":
-        result = DocumentationAgent(executor, src_dir=args.src_dir).run()
-        print(f"Documented {result.files_documented} Python file(s).")
-        for doc_path in result.docs_written:
-            print(f"Wrote {doc_path}")
+        result = DocumentationAgent(
+            executor,
+            src_dir=args.src_dir,
+            docs_dir=args.docs_dir,
+        ).run(
+            incremental=args.incremental,
+            prune_stale=args.prune_stale,
+            check=args.check,
+        )
+        if args.check:
+            return report_check_result(result)
+
+        print(f"Found {result.source_files_found} Python file(s).")
+        if result.docs_written:
+            for doc_path in result.docs_written:
+                print(f"Wrote {doc_path}")
+        else:
+            print("No documentation files needed updates.")
+        for doc_path in result.stale_docs_deleted:
+            print(f"Deleted stale {doc_path}")
+        if result.stale_docs:
+            print("Stale generated docs remain:")
+            for doc_path in result.stale_docs:
+                print(f"  {doc_path}")
+            print("Run with --prune-stale to delete them.")
         if args.show_trace:
             print("\nTool calls:")
             for call in result.tool_calls:
@@ -69,8 +90,42 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="Generate documentation.")
     run_parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Write only missing or changed generated docs.",
+    )
+    run_parser.add_argument(
+        "--prune-stale",
+        action="store_true",
+        help="Delete stale generated docs whose source files no longer exist.",
+    )
+    run_parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail without writing files when generated docs are out of date.",
+    )
+    run_parser.add_argument(
         "--show-trace",
         action="store_true",
         help="Print the tool calls selected by the agent.",
     )
     return parser
+
+
+def report_check_result(result: AgentRunResult) -> int:
+    """Print a documentation freshness report and return a process status."""
+    if not result.has_pending_changes:
+        print("Documentation is up to date.")
+        return 0
+
+    print("Documentation is out of date.")
+    if result.outdated_docs:
+        print("Missing or outdated docs:")
+        for doc_path in result.outdated_docs:
+            print(f"  {doc_path}")
+    if result.stale_docs:
+        print("Stale generated docs:")
+        for doc_path in result.stale_docs:
+            print(f"  {doc_path}")
+    print("Run: python3 doc_agent.py run --incremental --prune-stale")
+    return 1

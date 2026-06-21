@@ -100,6 +100,49 @@ def build_tool_registry(context: ToolContext) -> Dict[str, Tool]:
                 str(args["content"]),
             ),
         ),
+        "list_doc_files": Tool(
+            name="list_doc_files",
+            description="Returns a list of Markdown documentation files in the configured docs directory.",
+            parameters={
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
+            handler=lambda args: list_doc_files(context),
+        ),
+        "read_doc_file": Tool(
+            name="read_doc_file",
+            description="Reads the content of a specified Markdown documentation file.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": "Documentation file name relative to the docs directory.",
+                    },
+                },
+                "required": ["file_name"],
+                "additionalProperties": False,
+            },
+            handler=lambda args: read_doc_file(context, str(args["file_name"])),
+        ),
+        "delete_doc_file": Tool(
+            name="delete_doc_file",
+            description="Deletes a stale generated Markdown documentation file from the configured docs directory.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": "Documentation file name relative to the docs directory.",
+                    },
+                },
+                "required": ["file_name"],
+                "additionalProperties": False,
+            },
+            handler=lambda args: delete_doc_file(context, str(args["file_name"])),
+        ),
     }
 
 
@@ -129,16 +172,61 @@ def read_file(context: ToolContext, file_path: str) -> str:
 
 def write_doc_file(context: ToolContext, file_name: str, content: str) -> str:
     """Write Markdown documentation under the configured docs directory."""
-    docs_root = context.documentation_root
-    path = resolve_under_root(docs_root, file_name)
-    if not is_relative_to(path, docs_root):
-        raise ValueError(f"write_doc_file can only write files in {context.docs_dir}/")
-    if path.suffix != ".md":
-        raise ValueError("write_doc_file can only write Markdown files.")
-
+    path = resolve_doc_file(context, file_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return relative_to_root(context.project_root, path)
+
+
+def list_doc_files(context: ToolContext) -> list[str]:
+    """Return Markdown files under the configured documentation directory."""
+    docs_root = context.documentation_root
+    if not docs_root.exists():
+        return []
+
+    files = []
+    for path in sorted(docs_root.rglob("*.md")):
+        if "__pycache__" in path.parts:
+            continue
+        files.append(relative_to_root(docs_root, path))
+    return files
+
+
+def read_doc_file(context: ToolContext, file_name: str) -> str:
+    """Read a Markdown documentation file after validating its location."""
+    path = resolve_doc_file(context, file_name)
+    return path.read_text(encoding="utf-8")
+
+
+def delete_doc_file(context: ToolContext, file_name: str) -> str:
+    """Delete a Markdown documentation file after validating its location."""
+    path = resolve_doc_file(context, file_name)
+    path.unlink()
+    remove_empty_parent_dirs(path.parent, context.documentation_root)
+    return relative_to_root(context.project_root, path)
+
+
+def resolve_doc_file(context: ToolContext, file_name: str) -> Path:
+    """Resolve and validate a docs-relative Markdown file path."""
+    docs_root = context.documentation_root
+    path = resolve_under_root(docs_root, file_name)
+    if not is_relative_to(path, docs_root):
+        raise ValueError(f"Documentation tools can only access {context.docs_dir}/")
+    if path.suffix != ".md":
+        raise ValueError("Documentation tools can only access Markdown files.")
+    return path
+
+
+def remove_empty_parent_dirs(path: Path, stop_at: Path) -> None:
+    """Remove empty directories above a deleted docs file."""
+    stop_at = stop_at.resolve()
+    current = path.resolve()
+    while current != stop_at and is_relative_to(current, stop_at):
+        try:
+            current.rmdir()
+        except OSError:
+            return
+        current = current.parent
 
 
 def resolve_under_root(root: Path, path: str) -> Path:

@@ -95,12 +95,37 @@ Generate Markdown documentation from Python files in `src/` into `docs/`:
 python3 doc_agent.py run --show-trace
 ```
 
-The agent uses three tools:
+Update only missing or changed generated docs and remove stale generated docs:
+
+```bash
+python3 doc_agent.py run --incremental --prune-stale
+```
+
+Check whether generated docs are current without writing files:
+
+```bash
+python3 doc_agent.py run --check
+```
+
+Install the repository pre-push hook:
+
+```bash
+python3 scripts/install_git_hooks.py
+```
+
+After installation, `git push` runs the same documentation freshness check
+locally. GitHub Actions also runs tests and `python doc_agent.py run --check`
+on pushes to `main` and pull requests.
+
+The agent uses six tools:
 
 - `list_python_files` returns Python files from the configured source directory.
 - `read_file` reads a selected Python file after validating the `file_path` arg.
 - `write_doc_file` writes Markdown into the configured docs directory after
   validating `file_name` and `content`.
+- `list_doc_files` returns Markdown files from the configured docs directory.
+- `read_doc_file` reads generated Markdown before deciding whether it changed.
+- `delete_doc_file` removes stale generated Markdown when `--prune-stale` is used.
 
 ## Data Model
 
